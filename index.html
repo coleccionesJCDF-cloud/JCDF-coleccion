@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ActionVault - Mi Colección</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Iconos -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-8">
+
+  <!-- Configuración de API Key -->
+  <script>
+    // ⚠️ REEMPLAZA ESTO CON TU CLAVE DE API DE GOOGLE DRIVE
+    const GOOGLE_DRIVE_API_KEY = "AIzaSyCw_qK2nhANWnUQdR_HqOgUU8hWMVIXrVE";
+  </script>
+
+  <!-- Encabezado Principal -->
+  <header class="max-w-7xl mx-auto mb-8 flex flex-col sm:flex-row justify-between items-center gap-4 border-b border-slate-800 pb-6">
+    <div class="flex items-center gap-3">
+      <button id="backBtn" onclick="showAlbumsView()" class="hidden bg-slate-800 hover:bg-slate-700 text-amber-400 px-4 py-2 rounded-xl border border-slate-700 font-bold transition flex items-center gap-2 text-sm">
+        <i class="fa-solid fa-arrow-left"></i> Volver a Álbumes
+      </button>
+      <div>
+        <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-500">
+          <i class="fa-solid fa-boxes-packing mr-2"></i> ActionVault
+        </h1>
+        <p id="viewSubtitle" class="text-slate-400 text-sm mt-0.5">Álbumes y carpetas de colección</p>
+      </div>
+    </div>
+
+    <!-- Botones de la Cabecera -->
+    <div class="flex flex-wrap gap-3">
+      <button onclick="openFolderImportModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg transition flex items-center gap-2 text-sm">
+        <i class="fa-solid fa-folder-plus"></i> Importar Carpeta Drive
+      </button>
+      <button onclick="openAlbumModal()" class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-4 py-2.5 rounded-xl shadow-lg transition flex items-center gap-2 text-sm">
+        <i class="fa-solid fa-plus"></i> Crear Álbum
+      </button>
+      <button onclick="openFigureModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold px-4 py-2.5 rounded-xl shadow-lg transition flex items-center gap-2 text-sm">
+        <i class="fa-solid fa-cube text-amber-400"></i> Añadir Figura
+      </button>
+    </div>
+  </header>
+
+  <!-- Filtros dentro del Álbum -->
+  <section id="albumFilters" class="hidden max-w-7xl mx-auto mb-8 bg-slate-800/60 backdrop-blur p-4 rounded-2xl border border-slate-700/50 flex flex-wrap gap-4 items-center justify-between">
+    <div class="flex-1 min-w-[240px]">
+      <input type="text" id="searchInput" oninput="renderGallery()" placeholder="Buscar por nombre, marca, serie..." class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-amber-500 text-slate-100">
+    </div>
+    <div class="flex flex-wrap gap-3">
+      <select id="filterBrand" onchange="renderGallery()" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none">
+        <option value="">Todas las Marcas</option>
+        <option value="McFarlane Toys">McFarlane Toys</option>
+        <option value="Hasbro">Hasbro</option>
+        <option value="Mattel">Mattel</option>
+        <option value="Bandai">Bandai</option>
+        <option value="NECA">NECA</option>
+        <option value="Mafex">Mafex</option>
+      </select>
+      <select id="filterScale" onchange="renderGallery()" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none">
+        <option value="">Todas las Escalas</option>
+        <option value="1/12 (6-7 in)">1/12 (6-7 in)</option>
+        <option value="1/6 (12 in)">1/6 (12 in)</option>
+        <option value="1/18 (3.75 in)">1/18 (3.75 in)</option>
+      </select>
+    </div>
+  </section>
+
+  <!-- Contenedor Principal -->
+  <main class="max-w-7xl mx-auto">
+    <!-- VISTA 1: Lista de Álbumes (Carpetas) -->
+    <div id="albumsGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></div>
+
+    <!-- VISTA 2: Fotos de Figuras dentro del Álbum -->
+    <div id="figuresGrid" class="hidden columns-1 sm:columns-2 md:columns-3 lg:columns-4 gap-6 space-y-6"></div>
+  </main>
+
+  <!-- Modal: Crear / Editar Álbum -->
+  <div id="albumModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-slate-800 border border-slate-700 w-full max-w-md rounded-2xl p-6 shadow-2xl">
+      <div class="flex justify-between items-center mb-4">
+        <h2 id="albumModalTitle" class="text-lg font-bold text-amber-400"><i class="fa-solid fa-folder-pen mr-2"></i> Administrar Álbum</h2>
+        <button onclick="closeAlbumModal()" class="text-slate-400 hover:text-white text-xl"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form onsubmit="saveAlbumForm(event)" class="space-y-4">
+        <input type="hidden" id="editAlbumOldName" value="">
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Nombre del Álbum / Estante *</label>
+          <input type="text" id="albumNameInput" required placeholder="Ej: Vitrina DC, Colección Marvel" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Enlace de Foto de Portada (Opcional)</label>
+          <input type="text" id="albumCoverInput" placeholder="https://drive.google.com/file/d/1A2B3C.../view" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 font-mono">
+          <p class="text-[11px] text-slate-400 mt-1">Si se deja vacío, usará la primera foto del álbum como portada.</p>
+        </div>
+
+        <div class="flex justify-end gap-3 pt-2">
+          <button type="button" onclick="closeAlbumModal()" class="px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm">Cancelar</button>
+          <button type="submit" class="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-sm">Guardar Álbum</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Importar Carpeta Automática desde Drive -->
+  <div id="folderModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-slate-800 border border-slate-700 w-full max-w-lg rounded-2xl p-6 shadow-2xl">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-lg font-bold text-emerald-400"><i class="fa-solid fa-folder-open mr-2"></i> Importar Carpeta de Google Drive</h2>
+        <button onclick="closeFolderModal()" class="text-slate-400 hover:text-white text-xl"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form onsubmit="importDriveFolderAuto(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Nombre del Álbum *</label>
+          <input type="text" id="importedAlbumName" required placeholder="Ej: DC Young Justice, Colección Batman" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Enlace o ID de la Carpeta de Google Drive *</label>
+          <input type="text" id="driveFolderUrl" required placeholder="https://drive.google.com/drive/folders/1A2B3C..." class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 font-mono">
+          <p class="text-[11px] text-slate-400 mt-1">Asegúrate de que la carpeta en Drive esté en "Cualquier persona con el enlace puede ver".</p>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Marca Predeterminada</label>
+            <input type="text" id="folderDefaultBrand" placeholder="Ej: Hasbro, Mattel" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Escala Predeterminada</label>
+            <select id="folderDefaultScale" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100">
+              <option value="1/12 (6-7 in)">1/12 (6-7 in)</option>
+              <option value="1/6 (12 in)">1/6 (12 in)</option>
+              <option value="1/18 (3.75 in)">1/18 (3.75 in)</option>
+            </select>
+          </div>
+        </div>
+        <div class="flex justify-end gap-3 pt-2">
+          <button type="button" onclick="closeFolderModal()" class="px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm">Cancelar</button>
+          <button type="submit" id="importBtn" class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm flex items-center gap-2">
+            <span>Importar Fotos</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Registrar / Editar Figura Individual -->
+  <div id="figureModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+    <div class="bg-slate-800 border border-slate-700 w-full max-w-2xl rounded-2xl max-h-[90vh] overflow-y-auto p-6 shadow-2xl">
+      <div class="flex justify-between items-center mb-6">
+        <h2 id="modalTitle" class="text-xl font-bold text-amber-400">Registrar Figura de Acción</h2>
+        <button onclick="closeFigureModal()" class="text-slate-400 hover:text-white text-xl"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <form id="figureForm" onsubmit="saveFigure(event)" class="space-y-4">
+        <input type="hidden" id="editId" value="">
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1">Enlaces de Google Drive (Pega 1 o varios enlaces, uno por línea) *</label>
+          <textarea id="driveUrl" required rows="3" placeholder="https://drive.google.com/file/d/1A2B3C.../view" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm focus:border-amber-500 text-slate-100 font-mono"></textarea>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Nombre del Personaje *</label>
+            <input type="text" id="name" required placeholder="Ej: Batman Hush" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100">
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-amber-400 mb-1"><i class="fa-solid fa-folder mr-1"></i> Seleccionar Álbum *</label>
+            <select id="albumSelect" required class="w-full bg-slate-900 border border-amber-500/40 rounded-xl px-3 py-2 text-sm text-slate-100">
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Marca / Fabricante *</label>
+            <input type="text" id="brand" required placeholder="Ej: McFarlane Toys, Hasbro" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100">
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Escala / Tamaño</label>
+            <select id="scaleSelect" onchange="toggleCustomScale(this.value)" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 mb-2">
+              <option value="1/12 (6-7 in)">1/12 (6-7 in)</option>
+              <option value="1/6 (12 in)">1/6 (12 in)</option>
+              <option value="1/18 (3.75 in)">1/18 (3.75 in)</option>
+              <option value="custom">Otro / Personalizado...</option>
+            </select>
+            <input type="text" id="customScaleInput" placeholder="Escribe el tamaño (ej: 7.5 pulg, 10 cm)" class="hidden w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100">
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Serie / Línea</label>
+            <input type="text" id="series" placeholder="Ej: DC Multiverse, Marvel Legends" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Caricatura / Película Basada</label>
+            <input type="text" id="mediaSource" placeholder="Ej: Batman: The Animated Series" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Año de Lanzamiento</label>
+            <input type="number" id="year" placeholder="Ej: 2023" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-700">
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1">Estado de Accesorios</label>
+            <select id="accessoriesStatus" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100">
+              <option value="Completo">Completo</option>
+              <option value="Incompleto">Incompleto</option>
+              <option value="Sin accesorios">Sin accesorios</option>
+            </select>
+          </div>
+
+          <div class="flex items-center pt-5">
+            <label class="flex items-center gap-2 cursor-pointer text-sm text-slate-300">
+              <input type="checkbox" id="isBaf" class="w-4 h-4 rounded bg-slate-900 border-slate-700 text-amber-500 focus:ring-amber-500">
+              Es pieza BAF / Arma BAF
+            </label>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-3 mt-6">
+          <button type="button" onclick="closeFigureModal()" class="px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 text-sm">Cancelar</button>
+          <button type="submit" id="saveBtn" class="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-sm">Guardar Figura</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- JavaScript Principal -->
+  <script>
+    let figures = JSON.parse(localStorage.getItem('action_vault_figures') || '[]');
+    let albums = JSON.parse(localStorage.getItem('action_vault_albums') || '[]');
+    let albumCovers = JSON.parse(localStorage.getItem('action_vault_album_covers') || '{}');
+    let activeAlbum = null;
+
+    function syncAlbums() {
+      const figureAlbums = figures.map(f => f.album).filter(Boolean);
+      const combined = [...new Set([...albums, ...figureAlbums])];
+      if (combined.length === 0) combined.push('General');
+      albums = combined;
+      localStorage.setItem('action_vault_albums', JSON.stringify(albums));
+    }
+
+    function extractFolderId(url) {
+      if (!url) return '';
+      const match = url.match(/\/folders\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
+      return match ? match[1] : url.trim();
+    }
+
+    function extractDriveId(url) {
+      if (!url) return '';
+      const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/);
+      return match ? match[1] : url.trim();
+    }
+
+    function getDriveImageUrl(fileId) {
+      return `https://lh3.googleusercontent.com/d/${fileId}=s800`;
+    }
+
+    function toggleCustomScale(val) {
+      const input = document.getElementById('customScaleInput');
+      if (val === 'custom') {
+        input.classList.remove('hidden');
+        input.required = true;
+      } else {
+        input.classList.add('hidden');
+        input.required = false;
+        input.value = '';
+      }
+    }
+
+    function openAlbumModal(albumName = null) {
+      document.getElementById('editAlbumOldName').value = albumName || '';
+      document.getElementById('albumNameInput').value = albumName || '';
+      document.getElementById('albumCoverInput').value = albumCovers[albumName] ? `https://drive.google.com/file/d/${albumCovers[albumName]}/view` : '';
+
+      document.getElementById('albumModalTitle').innerText = albumName ? 'Editar Álbum / Estante' : 'Crear Nuevo Álbum';
+      document.getElementById('albumModal').classList.remove('hidden');
+    }
+
+    function closeAlbumModal() {
+      document.getElementById('albumModal').classList.add('hidden');
+    }
+
+    function saveAlbumForm(e) {
+      e.preventDefault();
+      const oldName = document.getElementById('editAlbumOldName').value;
+      const newName = document.getElementById('albumNameInput').value.trim();
+      const rawCoverUrl = document.getElementById('albumCoverInput').value.trim();
+      const coverFileId = extractDriveId(rawCoverUrl);
+
+      if (!newName) return;
+
+      if (oldName) {
+        albums = albums.map(a => a === oldName ? newName : a);
+        figures = figures.map(f => f.album === oldName ? { ...f, album: newName } : f);
+        if (albumCovers[oldName]) {
+          delete albumCovers[oldName];
+        }
+      } else if (!albums.includes(newName)) {
+        albums.push(newName);
+      }
+
+      if (coverFileId) {
+        albumCovers[newName] = coverFileId;
+      } else {
+        delete albumCovers[newName];
+      }
+
+      localStorage.setItem('action_vault_albums', JSON.stringify(albums));
+      localStorage.setItem('action_vault_figures', JSON.stringify(figures));
+      localStorage.setItem('action_vault_album_covers', JSON.stringify(albumCovers));
+
+      closeAlbumModal();
+      showAlbumsView();
+    }
+
+    function editAlbum(name, evt) {
+      if (evt) evt.stopPropagation();
+      openAlbumModal(name);
+    }
+
+    function deleteAlbum(name, evt) {
+      if (evt) evt.stopPropagation();
+      if (confirm(`¿Eliminar el álbum "${name}" y sus figuras?`)) {
+        albums = albums.filter(a => a !== name);
+        figures = figures.filter(f => f.album !== name);
+        delete albumCovers[name];
+
+        localStorage.setItem('action_vault_albums', JSON.stringify(albums));
+        localStorage.setItem('action_vault_figures', JSON.stringify(figures));
+        localStorage.setItem('action_vault_album_covers', JSON.stringify(albumCovers));
+        showAlbumsView();
+      }
+    }
+
+    function openFolderImportModal() {
+      document.getElementById('importedAlbumName').value = '';
+      document.getElementById('driveFolderUrl').value = '';
+      document.getElementById('folderDefaultBrand').value = '';
+      document.getElementById('folderModal').classList.remove('hidden');
+    }
+
+    function closeFolderModal() {
+      document.getElementById('folderModal').classList.add('hidden');
+    }
+
+    async function importDriveFolderAuto(e) {
+      e.preventDefault();
+      const albumName = document.getElementById('importedAlbumName').value.trim();
+      const folderUrlRaw = document.getElementById('driveFolderUrl').value;
+      const folderId = extractFolderId(folderUrlRaw);
+      const brand = document.getElementById('folderDefaultBrand').value.trim() || 'Desconocida';
+      const scale = document.getElementById('folderDefaultScale').value;
+      const importBtn = document.getElementById('importBtn');
+
+      if (!GOOGLE_DRIVE_API_KEY || GOOGLE_DRIVE_API_KEY === "PEGA_AQUI_TU_API_KEY") {
+        alert("Atención: Necesitas configurar tu GOOGLE_DRIVE_API_KEY en el código HTML para usar la importación automática.");
+        return;
+      }
+
+      try {
+        importBtn.disabled = true;
+        importBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Leyendo carpeta...`;
+
+        const apiUrl = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents+and+trashed=false&key=${GOOGLE_DRIVE_API_KEY}&fields=files(id,name,mimeType)`;
+        const response = await fetch(apiUrl);
+        const data = await response.json();
+
+        if (data.error) {
+          alert("Error de Google API: " + data.error.message + "\n\nAsegúrate de que la carpeta esté configurada en Google Drive como 'Cualquier persona con el enlace puede ver'.");
+          return;
+        }
+
+        const files = data.files.filter(f => f.mimeType.includes('image/'));
+
+        if (files.length === 0) {
+          alert("No se encontraron imágenes en esa carpeta de Drive.");
+          return;
+        }
+
+        if (!albums.includes(albumName)) {
+          albums.push(albumName);
+          localStorage.setItem('action_vault_albums', JSON.stringify(albums));
+        }
+
+        files.forEach((file, idx) => {
+          const cleanName = file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
+
+          figures.unshift({
+            id: (Date.now() + idx).toString(),
+            driveId: file.id,
+            name: cleanName || `Figura ${idx + 1}`,
+            album: albumName,
+            brand: brand,
+            scale: scale,
+            series: '',
+            mediaSource: '',
+            year: '',
+            accessoriesStatus: 'Completo',
+            isBaf: false
+          });
+        });
+
+        localStorage.setItem('action_vault_figures', JSON.stringify(figures));
+        closeFolderModal();
+        showAlbumsView();
+
+      } catch (error) {
+        alert("Error al conectar con Google Drive: " + error.message);
+      } finally {
+        importBtn.disabled = false;
+        importBtn.innerHTML = `<span>Importar Fotos</span>`;
+      }
+    }
+
+    function showAlbumsView() {
+      activeAlbum = null;
+      syncAlbums();
+
+      document.getElementById('backBtn').classList.add('hidden');
+      document.getElementById('albumFilters').classList.add('hidden');
+      document.getElementById('figuresGrid').classList.add('hidden');
+      document.getElementById('albumsGrid').classList.remove('hidden');
+      document.getElementById('viewSubtitle').innerText = 'Álbumes y carpetas de colección';
+
+      renderAlbums();
+    }
+
+    function openAlbum(name) {
+      activeAlbum = name;
+
+      document.getElementById('backBtn').classList.remove('hidden');
+      document.getElementById('albumFilters').classList.remove('hidden');
+      document.getElementById('albumsGrid').classList.add('hidden');
+      document.getElementById('figuresGrid').classList.remove('hidden');
+      document.getElementById('viewSubtitle').innerText = `Carpeta: ${name}`;
+
+      renderGallery();
+    }
+
+    function renderAlbums() {
+      const grid = document.getElementById('albumsGrid');
+
+      if (albums.length === 0) {
+        grid.innerHTML = `
+          <div class="col-span-full text-center py-16 text-slate-500">
+            <i class="fa-solid fa-folder-open text-5xl mb-4 text-slate-600"></i>
+            <p class="text-base font-semibold">No tienes álbumes creados aún.</p>
+          </div>
+        `;
+        return;
+      }
+
+      grid.innerHTML = albums.map(alb => {
+        const albumFigs = figures.filter(f => f.album === alb);
+        const customCover = albumCovers[alb];
+        const coverImg = customCover 
+          ? getDriveImageUrl(customCover) 
+          : (albumFigs.length > 0 ? getDriveImageUrl(albumFigs[0].driveId) : null);
+
+        return `
+          <div class="bg-slate-800 rounded-2xl overflow-hidden border border-slate-700 shadow-xl flex flex-col justify-between">
+            <!-- Área Clickeable de la Imagen -->
+            <div onclick="openAlbum('${alb}')" class="relative h-48 bg-slate-950 overflow-hidden flex items-center justify-center cursor-pointer group">
+              ${coverImg ? `
+                <img src="${coverImg}" alt="${alb}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
+              ` : `
+                <i class="fa-solid fa-folder-open text-5xl text-slate-700 group-hover:text-amber-500 transition"></i>
+              `}
+              <span class="absolute top-3 left-3 bg-slate-900/90 text-amber-400 text-xs font-bold px-3 py-1 rounded-lg border border-amber-500/20">
+                <i class="fa-solid fa-boxes-packing mr-1"></i> ${albumFigs.length} ${albumFigs.length === 1 ? 'figura' : 'figuras'}
+              </span>
+            </div>
+
+            <!-- Pie de Tarjeta con Título y Botones Dedicados -->
+            <div class="p-4 bg-slate-800 border-t border-slate-700/60 flex flex-col gap-3">
+              <div onclick="openAlbum('${alb}')" class="cursor-pointer flex justify-between items-center">
+                <h3 class="font-bold text-lg text-slate-100 hover:text-amber-400 transition truncate">${alb}</h3>
+                <i class="fa-solid fa-chevron-right text-slate-500 text-sm"></i>
+              </div>
+
+              <!-- BARRA DE ACCIONES VISIBLE Y DEDICADA -->
+              <div class="flex gap-2 pt-2 border-t border-slate-700/40">
+                <button type="button" onclick="editAlbum('${alb}', event)" class="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-1.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow transition">
+                  <i class="fa-solid fa-pen-to-square"></i> Editar
+                </button>
+                ${alb !== 'General' ? `
+                  <button type="button" onclick="deleteAlbum('${alb}', event)" class="bg-red-600/80 hover:bg-red-600 text-white font-bold py-1.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow transition">
+                    <i class="fa-solid fa-trash"></i>
+                  </button>
+                ` : ''}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function populateAlbumSelect() {
+      const select = document.getElementById('albumSelect');
+      select.innerHTML = albums.map(a => `<option value="${a}">${a}</option>`).join('');
+      if (activeAlbum) {
+        select.value = activeAlbum;
+      }
+    }
+
+    function openFigureModal() {
+      document.getElementById('figureForm').reset();
+      document.getElementById('editId').value = '';
+      document.getElementById('modalTitle').innerText = 'Registrar Figura de Acción';
+      document.getElementById('saveBtn').innerText = 'Guardar Figura';
+      
+      populateAlbumSelect();
+      toggleCustomScale('1/12 (6-7 in)');
+      document.getElementById('figureModal').classList.remove('hidden');
+    }
+
+    function editFigure(id) {
+      const fig = figures.find(f => f.id === id);
+      if (!fig) return;
+
+      populateAlbumSelect();
+
+      document.getElementById('editId').value = fig.id;
+      document.getElementById('driveUrl').value = fig.driveId ? `https://drive.google.com/file/d/${fig.driveId}/view` : '';
+      document.getElementById('name').value = fig.name || '';
+      document.getElementById('albumSelect').value = fig.album || 'General';
+      document.getElementById('brand').value = fig.brand || '';
+      
+      const standardScales = ['1/12 (6-7 in)', '1/6 (12 in)', '1/18 (3.75 in)'];
+      if (standardScales.includes(fig.scale)) {
+        document.getElementById('scaleSelect').value = fig.scale;
+        toggleCustomScale(fig.scale);
+      } else {
+        document.getElementById('scaleSelect').value = 'custom';
+        toggleCustomScale('custom');
+        document.getElementById('customScaleInput').value = fig.scale || '';
+      }
+
+      document.getElementById('series').value = fig.series || '';
+      document.getElementById('mediaSource').value = fig.mediaSource || '';
+      document.getElementById('year').value = fig.year || '';
+      document.getElementById('accessoriesStatus').value = fig.accessoriesStatus || 'Completo';
+      document.getElementById('isBaf').checked = !!fig.isBaf;
+
+      document.getElementById('modalTitle').innerText = 'Editar Figura';
+      document.getElementById('saveBtn').innerText = 'Actualizar Cambios';
+      document.getElementById('figureModal').classList.remove('hidden');
+    }
+
+    function closeFigureModal() {
+      document.getElementById('figureModal').classList.add('hidden');
+    }
+
+    function saveFigure(e) {
+      e.preventDefault();
+      const editId = document.getElementById('editId').value;
+      const rawText = document.getElementById('driveUrl').value;
+      const urls = rawText.split('\n').map(u => u.trim()).filter(Boolean);
+
+      const scaleSel = document.getElementById('scaleSelect').value;
+      const scaleVal = scaleSel === 'custom' ? document.getElementById('customScaleInput').value : scaleSel;
+      const baseName = document.getElementById('name').value;
+      const targetAlbum = document.getElementById('albumSelect').value;
+
+      if (editId) {
+        const fileId = extractDriveId(urls[0] || '');
+        figures = figures.map(f => f.id === editId ? {
+          ...f,
+          driveId: fileId,
+          name: baseName,
+          album: targetAlbum,
+          brand: document.getElementById('brand').value,
+          scale: scaleVal,
+          series: document.getElementById('series').value,
+          mediaSource: document.getElementById('mediaSource').value,
+          year: document.getElementById('year').value,
+          accessoriesStatus: document.getElementById('accessoriesStatus').value,
+          isBaf: document.getElementById('isBaf').checked
+        } : f);
+      } else {
+        urls.forEach((url, idx) => {
+          const fileId = extractDriveId(url);
+          if (!fileId) return;
+          figures.unshift({
+            id: (Date.now() + idx).toString(),
+            driveId: fileId,
+            name: urls.length > 1 ? `${baseName} (${idx + 1})` : baseName,
+            album: targetAlbum,
+            brand: document.getElementById('brand').value,
+            scale: scaleVal,
+            series: document.getElementById('series').value,
+            mediaSource: document.getElementById('mediaSource').value,
+            year: document.getElementById('year').value,
+            accessoriesStatus: document.getElementById('accessoriesStatus').value,
+            isBaf: document.getElementById('isBaf').checked
+          });
+        });
+      }
+
+      localStorage.setItem('action_vault_figures', JSON.stringify(figures));
+      closeFigureModal();
+
+      if (activeAlbum) {
+        renderGallery();
+      } else {
+        showAlbumsView();
+      }
+    }
+
+    function deleteFigure(id) {
+      if (confirm('¿Eliminar esta figura?')) {
+        figures = figures.filter(f => f.id !== id);
+        localStorage.setItem('action_vault_figures', JSON.stringify(figures));
+        renderGallery();
+      }
+    }
+
+    function renderGallery() {
+      const gallery = document.getElementById('figuresGrid');
+      const search = document.getElementById('searchInput').value.toLowerCase().trim();
+      const brandFilter = document.getElementById('filterBrand').value;
+      const scaleFilter = document.getElementById('filterScale').value;
+
+      const filtered = figures.filter(fig => {
+        const matchesAlbum = fig.album === activeAlbum;
+        const matchesSearch = !search || 
+                              (fig.name || '').toLowerCase().includes(search) || 
+                              (fig.brand || '').toLowerCase().includes(search) || 
+                              (fig.series || '').toLowerCase().includes(search) || 
+                              (fig.mediaSource || '').toLowerCase().includes(search);
+
+        const matchesBrand = !brandFilter || fig.brand === brandFilter;
+        const matchesScale = !scaleFilter || fig.scale === scaleFilter;
+
+        return matchesAlbum && matchesSearch && matchesBrand && matchesScale;
+      });
+
+      if (filtered.length === 0) {
+        gallery.innerHTML = `
+          <div class="col-span-full text-center py-12 text-slate-500">
+            <i class="fa-solid fa-box-open text-4xl mb-3"></i>
+            <p>No hay figuras registradas en la carpeta "${activeAlbum}".</p>
+          </div>
+        `;
+        return;
+      }
+
+      gallery.innerHTML = filtered.map(fig => `
+        <div class="break-inside-avoid bg-slate-800 rounded-2xl overflow-hidden border border-slate-700/60 shadow-xl hover:border-amber-500/50 transition duration-300 group">
+          <div class="relative overflow-hidden bg-slate-950 min-h-[200px]">
+            <img src="${getDriveImageUrl(fig.driveId)}" alt="${fig.name}" 
+                 class="w-full object-cover group-hover:scale-105 transition duration-500"
+                 onerror="this.src='https://via.placeholder.com/400x500/1e293b/94a3b8?text=Imagen+no+disponible'">
+            
+            <div class="absolute top-3 right-3 flex gap-2">
+              <button onclick="editFigure('${fig.id}')" title="Editar" class="bg-amber-500 hover:bg-amber-400 text-slate-950 p-2 rounded-xl text-xs shadow-md font-bold transition">
+                <i class="fa-solid fa-pen"></i>
+              </button>
+              <button onclick="deleteFigure('${fig.id}')" title="Eliminar" class="bg-red-600 hover:bg-red-500 text-white p-2 rounded-xl text-xs shadow-md transition">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            </div>
+
+            <span class="absolute bottom-3 left-3 bg-slate-900/80 backdrop-blur text-amber-400 text-[10px] font-bold px-2.5 py-1 rounded-lg">
+              ${fig.scale || 'N/A'}
+            </span>
+          </div>
+
+          <div class="p-4 space-y-2">
+            <h3 class="font-bold text-base text-slate-100 group-hover:text-amber-400 transition">${fig.name}</h3>
+
+            <div class="flex flex-wrap gap-1.5 text-[11px]">
+              <span class="bg-slate-700/60 text-slate-300 px-2 py-0.5 rounded-md">${fig.brand}</span>
+              ${fig.series ? `<span class="bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-md">${fig.series}</span>` : ''}
+              ${fig.year ? `<span class="bg-slate-700/60 text-slate-400 px-2 py-0.5 rounded-md">${fig.year}</span>` : ''}
+            </div>
+
+            ${fig.mediaSource ? `<p class="text-xs text-slate-400"><i class="fa-solid fa-tv text-[10px] mr-1"></i> ${fig.mediaSource}</p>` : ''}
+            
+            <div class="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-700/50 text-[11px]">
+              <span class="text-slate-300 bg-slate-900 px-2 py-0.5 rounded-md">
+                <i class="fa-solid fa-box text-amber-500 mr-1"></i> ${fig.accessoriesStatus || 'Completo'}
+              </span>
+              ${fig.isBaf ? `<span class="text-orange-400 bg-orange-950/40 border border-orange-800/40 px-2 py-0.5 rounded-md font-semibold"><i class="fa-solid fa-puzzle-piece mr-1"></i> BAF</span>` : ''}
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Carga inicial
+    showAlbumsView();
+  </script>
+</body>
+</html>
+
+<!-- Despliegue limpio -->
