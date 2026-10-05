@@ -14,7 +14,7 @@
   <!-- Configuración de API Key -->
   <script>
     // ⚠️ REEMPLAZA ESTO CON TU CLAVE DE API DE GOOGLE DRIVE
-    const GOOGLE_DRIVE_API_KEY = "AIzaSyCw_qK2nhANWnUQdR_HqOgUU8hWMVIXrVE";
+    const GOOGLE_DRIVE_API_KEY = "PEGA_AQUI_TU_API_KEY";
   </script>
 
   <!-- Encabezado Principal -->
@@ -45,12 +45,13 @@
     </div>
   </header>
 
-  <!-- Filtros dentro del Álbum -->
+  <!-- Filtros y Ordenamiento dentro del Álbum -->
   <section id="albumFilters" class="hidden max-w-7xl mx-auto mb-8 bg-slate-800/60 backdrop-blur p-4 rounded-2xl border border-slate-700/50 flex flex-wrap gap-4 items-center justify-between">
     <div class="flex-1 min-w-[240px]">
       <input type="text" id="searchInput" oninput="renderGallery()" placeholder="Buscar por nombre, marca, serie..." class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-amber-500 text-slate-100">
     </div>
-    <div class="flex flex-wrap gap-3">
+    <div class="flex flex-wrap gap-3 items-center">
+      <!-- Filtro por Marca -->
       <select id="filterBrand" onchange="renderGallery()" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none">
         <option value="">Todas las Marcas</option>
         <option value="McFarlane Toys">McFarlane Toys</option>
@@ -60,12 +61,23 @@
         <option value="NECA">NECA</option>
         <option value="Mafex">Mafex</option>
       </select>
+
+      <!-- Filtro por Serie -->
+      <input type="text" id="filterSeries" oninput="renderGallery()" placeholder="Filtrar por serie..." class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none w-36">
+
+      <!-- Filtro por Escala -->
       <select id="filterScale" onchange="renderGallery()" class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-300 focus:outline-none">
         <option value="">Todas las Escalas</option>
         <option value="1/12 (6-7 in)">1/12 (6-7 in)</option>
         <option value="1/6 (12 in)">1/6 (12 in)</option>
         <option value="1/18 (3.75 in)">1/18 (3.75 in)</option>
       </select>
+
+      <!-- Botón de Orden Alfabético -->
+      <button type="button" id="sortBtn" onclick="toggleSortOrder()" class="bg-slate-900 hover:bg-slate-700 text-amber-400 font-bold px-3 py-2 rounded-xl border border-slate-700 transition text-sm flex items-center gap-1.5" title="Cambiar orden alfabético">
+        <i class="fa-solid fa-arrow-down-a-z"></i>
+        <span id="sortLabel">A-Z</span>
+      </button>
     </div>
   </section>
 
@@ -238,6 +250,7 @@
     let albums = JSON.parse(localStorage.getItem('action_vault_albums') || '[]');
     let albumCovers = JSON.parse(localStorage.getItem('action_vault_album_covers') || '{}');
     let activeAlbum = null;
+    let sortAscending = true;
 
     function syncAlbums() {
       const figureAlbums = figures.map(f => f.album).filter(Boolean);
@@ -273,6 +286,22 @@
         input.required = false;
         input.value = '';
       }
+    }
+
+    function toggleSortOrder() {
+      sortAscending = !sortAscending;
+      const label = document.getElementById('sortLabel');
+      const btn = document.getElementById('sortBtn');
+
+      if (sortAscending) {
+        label.innerText = 'A-Z';
+        btn.innerHTML = `<i class="fa-solid fa-arrow-down-a-z"></i> <span id="sortLabel">A-Z</span>`;
+      } else {
+        label.innerText = 'Z-A';
+        btn.innerHTML = `<i class="fa-solid fa-arrow-up-z-a"></i> <span id="sortLabel">Z-A</span>`;
+      }
+
+      renderGallery();
     }
 
     function openAlbumModal(albumName = null) {
@@ -627,9 +656,10 @@
       const gallery = document.getElementById('figuresGrid');
       const search = document.getElementById('searchInput').value.toLowerCase().trim();
       const brandFilter = document.getElementById('filterBrand').value;
+      const seriesFilter = document.getElementById('filterSeries').value.toLowerCase().trim();
       const scaleFilter = document.getElementById('filterScale').value;
 
-      const filtered = figures.filter(fig => {
+      let filtered = figures.filter(fig => {
         const matchesAlbum = fig.album === activeAlbum;
         const matchesSearch = !search || 
                               (fig.name || '').toLowerCase().includes(search) || 
@@ -638,16 +668,28 @@
                               (fig.mediaSource || '').toLowerCase().includes(search);
 
         const matchesBrand = !brandFilter || fig.brand === brandFilter;
+        const matchesSeries = !seriesFilter || (fig.series || '').toLowerCase().includes(seriesFilter);
         const matchesScale = !scaleFilter || fig.scale === scaleFilter;
 
-        return matchesAlbum && matchesSearch && matchesBrand && matchesScale;
+        return matchesAlbum && matchesSearch && matchesBrand && matchesSeries && matchesScale;
+      });
+
+      // Ordenar por orden alfabético
+      filtered.sort((a, b) => {
+        const nameA = (a.name || '').toLowerCase();
+        const nameB = (b.name || '').toLowerCase();
+        if (sortAscending) {
+          return nameA.localeCompare(nameB);
+        } else {
+          return nameB.localeCompare(nameA);
+        }
       });
 
       if (filtered.length === 0) {
         gallery.innerHTML = `
           <div class="col-span-full text-center py-12 text-slate-500">
             <i class="fa-solid fa-box-open text-4xl mb-3"></i>
-            <p>No hay figuras registradas en la carpeta "${activeAlbum}".</p>
+            <p>No hay figuras registradas en la carpeta "${activeAlbum}" que coincidan con los filtros.</p>
           </div>
         `;
         return;
